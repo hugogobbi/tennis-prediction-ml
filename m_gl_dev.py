@@ -43,8 +43,8 @@ pd.set_option('display.max_columns', 500)
 
 
 #Code variables
-inputfilepath =  r'C:\Users\hgobb\Documents\Aleph\tennis_data\m_gl_data.csv'
-scaler_path = r'C:\Users\hgobb\Documents\Aleph\scaler/'
+inputfilepath =  r'.\m_gl_data.csv'
+scaler_path = r'.\scaler/'
 
 #   parameters
 # year list 
@@ -331,7 +331,7 @@ models.append(("RandomForest2",rf2))
 models.append(("MLPClassifier",MLPClassifier(solver='lbfgs', random_state=0,max_iter=1000)))
 
 
-# from https://www.kaggle.com/code/tflare/testing-multiple-models-with-scikit-learn-0-79425/notebook
+
 
 results = []
 names = []
