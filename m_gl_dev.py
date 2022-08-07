@@ -30,30 +30,32 @@ from sklearn.metrics import precision_score
 from datetime import datetime
 from datetime import timedelta
 import matplotlib.pyplot as plt
-import statistics 
-import scipy.stats as st
+# import statistics 
+# import scipy.stats as st
 import random
 from pickle import dump
+import math
+from time import time
 # import xgboost as xgb
 
-from sklearn.model_selection import cross_val_score
+# from sklearn.model_selection import cross_val_score
 # import pandas_profiling
 # sys.setrecursionlimit(10000)
 pd.set_option('display.max_columns', 500)
 
-
-#Code variables
+#Variables
 inputfilepath =  r'.\m_gl_data.csv'
 scaler_path = r'.\scaler/'
 
 #   parameters
-# year list 
+# year list -- filters out years data not in the list
 yearlist = ['2012','2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023','2024']
-# yearlist = ['2019']
+# max_rank_to_filter => filters matches with players above this rank
 max_rank_to_filter = 200
 # regenerate pickles('y') or pickup saved ones ---to add this feature
 rescale = 'y'
-# features y/n Improve this to a dictionary in order to make it possible to loop
+
+# Model features y/n Improve this to a dictionary in order to make it iterable
 f_court='y'
 f_surface='y'
 f_p1_rank='y'
@@ -70,18 +72,18 @@ f_p2_hand='y'
 f_p2_backhand='y'
 f_p1_fatigue='y'
 f_p2_fatigue='y'
-f_p1_b365='y'
+f_p1_b365='n'
 f_p2_b365='n'
-f_p1_height_sqr='n'
-f_p2_height_sqr='n'
-f_p1_age_sqr='n'
-f_p2_age_sqr='n'
-# features to rework
-# belo list probably not used
+f_p1_height_sqr='y'
+f_p2_height_sqr='y'
+f_p1_age_sqr='y'
+f_p2_age_sqr='y'
+
+
+# additional setup
 f_standardize = ['p1_rank','p2_rank','p1_age','p1_height','p2_age','p2_weight','p2_height','fatigue_p1','fatigue_p2','p1_b365','p2_b365']
 f_dummy = ['court','p1_hand','p1_backhand','p2_hand','p2_backhand']
 f_polynomial = ['p1_age','p1_height','p2_age','p2_height']
-
 f_poly_dic =	{'p1_age':[f_p1_age_sqr,'p1_age_sqr'] ,'p1_height':[f_p1_height_sqr,'p1_height_sqr'],'p2_age':[f_p2_age_sqr,'p2_age_sqr'],'p2_height':[f_p2_height_sqr,'p2_height_sqr']}
 f_standardize_dic = {'p1_rank':f_p1_rank ,'p2_rank': f_p2_rank,'p1_age': f_p1_age,'p1_height': f_p1_height,'p2_age': f_p2_age,'p2_weight': f_p2_weight,'p2_height': f_p2_height,'p1_fatigue': f_p1_fatigue,'p2_fatigue': f_p2_fatigue,'p1_b365': f_p1_b365,'p2_b365': f_p2_b365,'p1_age_sqr' : f_p1_age_sqr,'p1_height_sqr' : f_p1_height_sqr,'p2_age_sqr':f_p2_age_sqr,'p2_height_sqr':f_p2_height_sqr}       
 
@@ -97,9 +99,7 @@ df_res = df_res[df_res['e_date'].astype(str).str[:4].isin(yearlist)]
 df_res = df_res[df_res['p1_rank']<max_rank_to_filter]
 df_res = df_res[df_res['p2_rank']<max_rank_to_filter]
 
-# Preparing the features
-
-# dummy valid variables
+#  valid values for dummy features
 hand_v = ['Left-Handed','Right-Handed']
 backhand_v = ['Two-Handed Backhand','One-Handed Backhand']
 court_v = ['Indoor', 'Outdoor']
@@ -178,7 +178,7 @@ df_res1 = df_res1.set_index('copy_index')
 #  checks
 # df_res.to_csv(r'C:\Users\hgobb\Documents\Aleph\tennis_data\check.csv')
 
-#Sets definition
+#Splitting data into 3 sets
 df_res1 = df_res1[featurelist + ['is_winner']]
 r_train = 0.8
 r_validation = 0.10
@@ -190,7 +190,6 @@ X_test , y_test= np.array(test[featurelist]) ,np.array(test[['is_winner']])
 
 
 # broker score b365
-
 df_score = df_res[['result_id','e_date','p1_rank', 'p2_rank','p1_b365', 'p2_b365','is_winner']]
 df_score = df_score[(df_score['p1_b365']>0.5) & (df_score['p2_b365']>0.5) ]
 df_score['was_favorite'] = np.where((df_score['p1_b365'] <= df_score['p2_b365'] ), 1, 0)
@@ -204,29 +203,14 @@ print(('B365 Favourite strat return: ' + str(round(return_fav_strat*100,2)) + '%
 print(('B365 Challenger strat return: ' + str(round(return_chall_strat*100,2)) + '%'))
 
  
-
-#### Logistic regression
-print('Logistic regression')
-clf = LogisticRegression(random_state=0).fit(X, y.ravel())
-clf.predict(X[:5, :])
-y[:5]
-clf.predict_proba(X[:5, :])
-print(clf.score(X, y))
-print(clf.score(X_val, y_val))
-print(clf.score(X_test, y_test))
-
-
+### TRAINING MODELS
 clf_etc0 = ensemble.ExtraTreesClassifier(n_estimators=400, criterion ='entropy', random_state=0,max_features='auto')
 clf_etc0.fit(X, y.ravel())
 print('Extra trees classifier')
 print(clf_etc0.score(X, y))
 print(clf_etc0.score(X_val, y_val))
 print(clf_etc0.score(X_test, y_test))
-# dump(clf_etc0, open(r'C:\Users\hgobb\Documents\Aleph\Model_1\clf_etc0.pkl', 'wb'))
 
-
-clf_etc0.predict_proba(X_test[:1,:])
-clf_etc0.predict(X_test[:5,:])
 feature_importance  = clf_etc0.feature_importances_
 feature_importance_normalized = np.std([tree.feature_importances_ for tree in 
                                         clf_etc0.estimators_], 
@@ -238,109 +222,40 @@ plt.ylabel('Feature Importances')
 plt.title('Comparison of different Feature Importances') 
 plt.show() 
 
-# clf_etc0.predict_proba(X_val[:5, :])
-
-
-###clf = ExtraTreesClassifier(n_estimators=100, random_state=0)
-clf_etc = ensemble.ExtraTreesClassifier(n_estimators=400, random_state=1,max_features='auto')
-clf_etc.fit(X, y.ravel())
-print('Extra trees classifier')
-print(clf_etc.score(X, y))
-print(clf_etc.score(X_val, y_val))
-print(clf_etc.score(X_test, y_test))
-
-# #### K-nearest
-# print('K-nearest')
-# clf_kn = neighbors.KNeighborsClassifier(n_neighbors = 5)
-# clf_kn.fit(X, y.ravel())
-# print(clf_kn.score(X, y))
-# print(clf_kn.score(X_val, y_val))
-# print(clf_kn.score(X_test, y_test))
-# clf_kn.predict_proba(X[:5, :])
-# # #### SVM
-# # print('SVM')
-# # clf_svc = svm.SVC()
-# # clf_svc.fit(X, y.ravel())
-# # print(clf_svc.score(X, y))
-# # print(clf_svc.score(X_val, y_val))
-# # print(clf_svc.score(X_test, y_test))
-# #### Neural Networks Better to use keras
-# print('Neural Networks')
-# clf_nn = neural_network.MLPClassifier(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=(len(feature_names)+1, 6), random_state=1,max_iter = 10000)
-# clf_nn.fit(X, y.ravel())
-# print(clf_nn.score(X, y))
-# print(clf_nn.score(X_val, y_val))
-# print(clf_nn.score(X_test, y_test))
-# #### Random forest try grandient boosted trees  import GradientBoostingClassifier
-# #https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.HistGradientBoostingClassifier.html#sklearn.ensemble.HistGradientBoostingClassifier
-# clf_gbc = ensemble.GradientBoostingClassifier(n_estimators=100)
-# clf_gbc.fit(X, y.ravel())
-# print('Gradient Boosting Classifier')
-# print(clf_gbc.score(X, y))
-# print(clf_gbc.score(X_val, y_val))
-# print(clf_gbc.score(X_test, y_test))
-
-
-
-clf_rf = ensemble.RandomForestClassifier(max_depth=60, random_state=1)
-clf_rf.fit(X, y.ravel())
-print('Random forest')
-print(clf_rf.score(X, y))
-print(clf_rf.score(X_val, y_val))
-print(clf_rf.score(X_test, y_test))
-
-clf_rf0 = ensemble.RandomForestClassifier()
-clf_rf0.fit(X, y.ravel())
-print('Random forest')
-print(clf_rf0.score(X, y))
-print(clf_rf0.score(X_val, y_val))
-print(clf_rf0.score(X_test, y_test))
-# clf_rf0.predict_proba(X[:5, :])
-
-
-###clf = ExtraTreesClassifier(n_estimators=100, random_state=0)
-clf_etc = ensemble.ExtraTreesClassifier(n_estimators=200, random_state=1,max_features='auto')
-clf_etc.fit(X, y.ravel())
-print('Extra trees classifier')
-print(clf_etc.score(X, y))
-print(clf_etc.score(X_val, y_val))
-print(clf_etc.score(X_test, y_test))
-
-
-
-#########Ada
-clf_ada = ensemble.AdaBoostClassifier()
-clf_ada.fit(X, y.ravel())
-print('Ada Boost')
-print(clf_ada.score(X, y))
-print(clf_ada.score(X_val, y_val))
-print(clf_ada.score(X_test, y_test))
-
-
 
 models = []
 models.append(("LogisticRegression",LogisticRegression(max_iter=1000)))
-models.append(("SVC",SVC()))
+# models.append(("SVC",SVC()))
 models.append(("LinearSVC",LinearSVC()))
-models.append(("KNeighbors",KNeighborsClassifier()))
-models.append(("DecisionTree",DecisionTreeClassifier()))
+# models.append(("KNeighbors",KNeighborsClassifier(n_neighbors = 5)))
+# models.append(("DecisionTree",DecisionTreeClassifier()))
 models.append(("RandomForest",RandomForestClassifier()))
-rf2 = RandomForestClassifier(n_estimators=100, criterion='gini',
-                                max_depth=10, random_state=0, max_features=None)
-models.append(("RandomForest2",rf2))
-models.append(("MLPClassifier",MLPClassifier(solver='lbfgs', random_state=0,max_iter=1000)))
+models.append(("RandomForest2",RandomForestClassifier(n_estimators=100, criterion='gini',max_depth=10, random_state=0, max_features=None)))
+models.append(("RandomForest3",RandomForestClassifier(max_depth=60, random_state=1)))
+# models.append(("MLPClassifier",MLPClassifier(solver='lbfgs', random_state=0,max_iter=1000)))
+models.append(("Ada Boost",ensemble.AdaBoostClassifier()))
+models.append(("'Extra trees classifier'",ensemble.ExtraTreesClassifier(n_estimators=200, random_state=1,max_features='auto')))
 
 
-
-
-results = []
-names = []
-for name,model in models[8]:
-    print(name )
-    result = cross_val_score(model, X, y.ravel(),  cv=3)
+names , train_scr, val_scr, test_scr, train_time = [] , [] , [] ,[], []
+for name,model in models:
+    tic = time()
     names.append(name)
-    results.append(result)
+    print(name)
+    model.fit(X, y.ravel())
+    train_scr.append(model.score(X,y))
+    val_scr.append(model.score(X_val, y_val))
+    test_scr.append(model.score(X_test, y_test))
+    toc = time()
+    train_time.append(toc - tic)
+
+col_names =  ['Model', 'Train_score', 'Val_score', 'Test_score', 'Train time']
+outputs = list(zip(names , train_scr, val_scr, test_scr, train_time))
+result_df = pd.DataFrame.from_records(outputs, columns=col_names)
+result_df.sort_values(['Test_score'], ascending=[False], inplace = True)
+display(result_df)
+result_df.to_csv(r'./'+str(time()).replace('.','')+'.csv', index = False)
 
 
-for i in range(len(names)):
-    print(names[i],results[i].mean())
+
+
