@@ -11,4 +11,4 @@ Past match result data is found in the website http://tennis-data.co.uk/alldata.
 
 The past results data is combined with player specific characteristics web scrapped from the players profile pages in the ATP website. The main characteristics are birthday (age), hand, backhand and height.
 
-The process of combining the data, and cleaning of the data is not presented in the repository.
+The process of combining and cleaning the data is not presented in the repository.
